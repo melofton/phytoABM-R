@@ -1,0 +1,7 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+data/FCR_catwalk_EDI_2018_2022.csv
+*.rds
