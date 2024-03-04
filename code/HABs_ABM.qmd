@@ -537,7 +537,7 @@ env <- array(data = 0, dim = c(length(depths),5))
 ######### MANUALLY SIMULATED WATER TEMPERATURE ###########
 
 ######### GLM WATER TEMPERATURE ##########################
-wtemp <- read_csv("./data/cal_wtemp_GLM.csv") 
+wtemp <- read_csv("./model_inputs/cal_wtemp_GLM.csv") 
 env[,1] <- unlist(wtemp[,7])
 ######### GLM WATER TEMPERATURE ##########################
 
@@ -650,6 +650,9 @@ plot_yloc.d <- data.frame(ind_yloc[[1]]) %>%
   gather(X0.1:X9.3, key = "Depth_m",value = "num_agents") %>%
   mutate(Depth_m = as.double(substring(Depth_m, 2)))
 #head(plot_yloc.d)
+
+plot_yloc.d <- read_csv("./model_output/ABM_diatom_depthByTimestep_18hr.csv")
+plot_ts.d <- read_csv("./model_output/ABM_diatom_surfaceTimeseries_18hr.csv")
 
 ggplot(data = plot_yloc.d, aes(x = num_agents, y = Depth_m, group = timestep, color = timestep))+
   geom_path()+

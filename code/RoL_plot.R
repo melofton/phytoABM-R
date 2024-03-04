@@ -5,11 +5,13 @@
 #load packages
 library(tidyverse)
 library(lubridate)
+library(cowplot)
+
 
 #read in and wrangle data
 
 #GLM
-glm <- read_csv("GLM_output_summer_2021.csv")
+glm <- read_csv("./data/GLM_output_summer_2021.csv")
 
 GLM_day <- glm %>%
   filter(date(DateTime) == "2021-08-09") %>%
@@ -30,7 +32,7 @@ glm_join <- glm %>%
   select(DateTime, PHY_tchla_1.6)
 
 #FP
-fp <- read_csv("./HABs-ABM/data/FluoroProbe_2014_2021.csv") %>%
+fp <- read_csv("./data/FluoroProbe_2014_2021.csv") %>%
   filter(Reservoir == "FCR" & Site == 50 & year(DateTime) == 2021 & month(DateTime) %in% c(6:9))
 
 fp2 <- fp %>%
@@ -50,7 +52,7 @@ fp_surface[,"surface_prop"] <- fp_surface[,"surface_ugL"]/unlist(fp_surface[4,2]
 fp_surface[,"pft"] <- c("cyano_prop","diatom_prop","green_prop","total_prop")
 
 #EXO
-exo <- read_csv("./HABs-ABM/data/FCR_catwalk_EDI_2018_2022.csv") %>%
+exo <- read_csv("./data/FCR_catwalk_EDI_2018_2022.csv") %>%
   filter(year(DateTime) == 2021 & month(DateTime) %in% c(6:9)) %>%
   select(DateTime, EXOChla_ugL_1)
 
@@ -65,10 +67,10 @@ exo_no_outliers <- exo %>%
 #function to get model datetimes
 dates <- rep(seq(from=as.POSIXct("2021-08-09 05:01"),to=as.POSIXct("2021-08-09 23:00"),by="min", tz = "UTC"),4)
 
-abm <- read_csv("./HABs-ABM/ABM_output/ABM_all_surfaceTimeseries_18hr.csv") %>%
+abm <- read_csv("./model_output/ABM_all_surfaceTimeseries_18hr.csv") %>%
   mutate(DateTime = dates)
 
-abm_prop <- read_csv("./HABs-ABM/ABM_output/ABM_allProp_surfaceTimeseries.csv") %>%
+abm_prop <- read_csv("./model_output/ABM_allProp_surfaceTimeseries_18hr.csv") %>%
   mutate(DateTime = dates) %>%
   mutate(prop_agents = prop_agents/100) %>%
   mutate(facet = "pretty")
@@ -85,13 +87,20 @@ ggplot(data = GLM_day, aes(x = DateTime, y = mmolCm3, group = pft, color = pft))
   theme_bw()
 
 ggplot(data = exo_day, aes(x = DateTime, y = EXOChla_ugL_1))+
-  geom_line()+
-  #ylim(5,15)+
+  geom_point()+
   theme_bw()
 
-ggplot(data = abm, aes(x = timestep, y = num_agents, group = pft, color = pft)) +
+agents_ts <- ggplot(data = abm, aes(x = DateTime, y = num_agents, group = pft, color = pft)) +
   geom_line()+
-  theme_bw()
+  theme_bw()+
+  ylab("Number of agents")+
+  labs(color = "PFT")+
+  scale_x_datetime(date_labels = "%H:%M", date_breaks = "2 hours")+
+  xlab("Time of day")
+  
+
+ggsave(agents_ts, filename = "./plot_output/ABM_agents_timeseries.tif",height = 2.5, width = 5,
+       units = "in", dpi = 300, dev = "tiff")
 
 ggplot() +
   geom_line(data = abm_prop, aes(x = DateTime, y = prop_agents, group = pft, color = pft))+
@@ -147,7 +156,7 @@ axis(side = 4, at = pretty(range(y2)))      # Add second axis
 mtext("y2", side = 4, line = 3)             # Add second axis label
 
 
-fac.labs <- c("IBM","Observed","Process-based")
+fac.labs <- c("IBM (individuals)","Obs. chla (ug/L)","GLM-AED chl-a (ug/L)")
 names(fac.labs) <- c("ABM","EXOChla_ugL_1","PHY_tchla_1.6")
 
 ann_text <- data.frame(DateTime = rep(as.POSIXct("2021-08-09 02:00"),times = 3),
@@ -163,7 +172,7 @@ compare <- ggplot(data = money_df, aes(x = DateTime, y = phyto))+
   theme_bw()+
   theme(strip.placement = "outside", legend.position = "none",
         strip.text.y = element_text(
-          size = 12
+          size = 9
         ),
         strip.background = element_blank(
         ),
@@ -175,7 +184,7 @@ compare <- ggplot(data = money_df, aes(x = DateTime, y = phyto))+
   geom_text(data = ann_text,label = ann_text$lab, size = 6)
 compare
 
-ggsave(compare, filename = "./HABs-ABM/IBM_plot_v2.tif",height = 4.5, width = 3.5,
+ggsave(compare, filename = "./plot_output/IBM_plot_v2.tif",height = 4.5, width = 3.5,
        units = "in", dpi = 300, dev = "tiff")
 
 fac.labs2 <- c("Proportion")
@@ -213,11 +222,99 @@ groups <- ggplot() +
   
 groups
 
-library(cowplot)
+ggsave(groups, filename = "./plot_output/pft_proportions.tif",height = 4, width = 5,
+       units = "in", dpi = 300, dev = "tiff")
 
 final_plot<-plot_grid(compare, groups, scale = 1,
                 nrow = 2, ncol = 1, rel_heights = c(2.5,1.7),
                 align = "v")
-ggsave(final_plot, filename = "./HABs-ABM/IBM_plot.tif",height = 7, width = 4,
+ggsave(final_plot, filename = "./plot_output/IBM_plot.tif",height = 7, width = 4,
        units = "in", dpi = 300, dev = "tiff")
+
+# =============================================================================
+# Plot the results
+# =============================================================================
+
+##plot the environment (for static simulations)
+# plot_env = data.frame(wt = env[,1],
+#                       yloc = env[,2],
+#                       swr = env[,5])
+# 
+# ggplot(data = plot_env, aes(x = wt, y = yloc))+
+#   geom_path()+
+#   scale_y_reverse()+
+#   theme_classic()+
+#   xlab("degrees C")+
+#   ylab("Depth (m)")+
+#   ggtitle("Water temperature (degrees C)")
+# 
+# ggplot(data = plot_env, aes(x = swr, y = yloc))+
+#   geom_path()+
+#   scale_y_reverse()+
+#   theme_classic()+
+#   xlab("W m^-2")+
+#   ylab("Depth (m)")+
+#   ggtitle("Shortwave radiation")
+
+##plot initial conditions
+# fp_plot <- fp %>%
+#   gather(GreenAlgae_ugL:TotalConcNoMixed_ugL, key = "spectral_group", value = "ugL")
+# ggplot(data = fp_plot, aes(x = ugL, y = Depth_inc, group = spectral_group, color = spectral_group))+
+#   geom_path()+
+#   scale_y_reverse()+
+#   theme_classic()+
+#   xlab("ugL")+
+#   ylab("Depth (m)")+
+#   ggtitle("Initial conditions: FP cast")
+
+# Plot ABM output
+
+ts_keep <- seq(from = 0, to = 100440, by = 10)
+
+plot_yloc.d <- read_csv("./model_output/ABM_diatom_depthByTimestep_18hr.csv") %>%
+  filter(timestep %in% ts_keep)
+plot_yloc.c <- read_csv("./model_output/ABM_cyano_depthByTimestep_18hr.csv") %>%
+  filter(timestep %in% ts_keep)
+plot_yloc.g <- read_csv("./model_output/ABM_green_depthByTimestep_18hr.csv") %>%
+  filter(timestep %in% ts_keep)
+
+DepthTimeBrown <- ggplot(data = plot_yloc.d, aes(x = num_agents, y = Depth_m, group = timestep, color = timestep))+
+  geom_path()+
+  scale_y_reverse()+
+  theme_classic()+
+  ggtitle("Brown algae")+
+  xlab("Individuals")+
+  ylab("Depth (m)")+
+  labs(color = "Time (minutes)")+
+  theme(legend.position = "none")
+DepthTimeBrown
+
+DepthTimeGreen <- ggplot(data = plot_yloc.g, aes(x = num_agents, y = Depth_m, group = timestep, color = timestep))+
+  geom_path()+
+  scale_y_reverse()+
+  theme_classic()+
+  ggtitle("Green algae")+
+  xlab("Individuals")+
+  ylab("Depth (m)")+
+  labs(color = "Time (minutes)")
+DepthTimeGreen
+
+DepthTimeCyano <- ggplot(data = plot_yloc.c, aes(x = num_agents, y = Depth_m, group = timestep, color = timestep))+
+  geom_path()+
+  scale_y_reverse()+
+  theme_classic()+
+  ggtitle("Cyanobacteria")+
+  xlab("Individuals")+
+  ylab("Depth (m)")+
+  labs(color = "Time (minutes)")+
+  theme(legend.position = "none")
+DepthTimeCyano
+
+final_plot<-plot_grid(DepthTimeCyano, DepthTimeBrown, DepthTimeGreen, scale = 1,
+                      nrow = 1, ncol = 3, rel_widths = c(0.7, 0.7,1),
+                      align = "h")
+ggsave(final_plot, filename = "./plot_output/depth_by_time_pfts.tif",height = 5, width = 10,
+       units = "in", dpi = 300, dev = "tiff")
+
+
 
