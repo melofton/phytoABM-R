@@ -1,0 +1,130 @@
+---
+title: "Notes on example IBM for lake phytoplankton"
+author: "Mary Lofton"
+format: html
+editor: visual
+---
+
+## Provenance
+
+The code below is adapted from <https://bradduthie.github.io/blog/individual-based-models-in-r/>.
+
+## Modification workflow
+
+1.  Random movement in one dimension of individuals seeded from a simulated depth profile, with a "sticky" upper/lower boundary
+
+    1.  Eliminate x-dimension - check
+
+    2.  Individuals move in increments of 0.1 m - check
+
+    3.  Create "sticky" boundaries (individuals who move past the boundary are put back at the edge) - check
+
+    4.  Seed individuals based on a depth profile from 0-9.3 m in 0.1 m increments, using an actual FP profile as a starting point - check
+
+    5.  Eliminate birth and death for now and predators altogether - check
+
+    6.  Alter plot so that you can see how individuals are moving over depth/time - check
+
+2.  Movement of individuals given static water temp profile using turbulence/diffusion equation
+
+    1.  Create a new dataframe for environmental conditions that can be referenced during model run (columns for now are depth, water temperature); start w/ constant water temperature so can see if phytos move towards constant distribution across depth over time - check
+
+    2.  Figure out what other environmental conditions/traits need to be specified to provide all the correct information to eq. 9 of Hassan Ranjbar, Hamilton, et al. - check
+
+        1.  cell density: \~950 kg m-3 for buoyant cyanos; \~1100 kg m-3 for diatoms (reference Reynolds 2006)
+
+        2.  cell diameter: in meters; thinking somewhere in 10-20 um for FCR since cells usually small
+
+        3.  cell shape: use 1 as a starting point (assuming spherical shape)
+
+    3.  Add necessary environmental conditions/traits to environmental dataframe and inds, respectively
+
+        1.  need to calculate dynamic (absolute) viscosity of water; use Korson et al. 1969
+
+        2.  what eq to use to calculate water density from temperature? think might assume pure water for now and use Kell equation (Kell, 1975), then can go from there
+
+    4.  Edit "movement" function to use eq. 9 instead of random movement
+
+        1.  first, just incorporate buoyancy/sinking rate term and make sure phytos are behaving as expected in stratified and unstratified conditions - check
+
+        2.  next, worry about random walk to simulate turbulent transport --\> key here is if we want to use Visser's random walk formulation (which is well-established and probably a good choice) need to calculate vertical diffusivity from water temperature - check
+
+            1.  fun fact, apparently the Visser random walk model has to operate at a time scale on the order of 1-60 s in order to be valid --\> this is crazy! (see Ross & Sharples 2004) and explains why Feng et al 2018 are operating on a 1-minute timestep, so now need to decide whether to move the whole model over to a minute (or shorter) timestep or how else I am going to handle that
+
+                1.  first, make sure movement code is working properly at a minute or sub-minute timestep with birth and death shut off; get an idea of runtimes, outcomes, etc. - check
+
+                2.  next, figure out if can adjust birth/death functions to shorter timestep, just knowing that environment won't be updated at every timestep - check
+
+        3.  alternatively, if we are not going into forecasting mode and are just "coupling" to GLM, use CCC's sim to get u_mean output for each layer and assume cells are transported along with that --\> nope, this will not work b/c u_mean is actually u_star, which is the water friction velocity, not a flow field
+
+            1.  however, that will be really helpful when coupling GLM b/c we can get density and u_star from GLM output easily; however I'm not clear on how u_star can be a vector over depth; I thought it was one value per profile; need to check GLM output on this
+
+    5.  Edit "death" function
+
+        1.  agents that reach the sediments die - check
+
+        2.  agents can also be grazed, which should occur at different rates depending on the taxon; see p. 299 of Reynolds; "brown algae" and green algae should have highest rate, as Cryptomonas is \~100%, Asterionella is \>50% in the summer, and small chlorophytes ("Ankyra"), such as found in FCR, are almost 100% - check
+
+        3.  after build in light-dependent growth, could also keep track of light exposure and if an agent has seen no light for 24 hrs, it dies - check
+
+        4.  what to do about endless cyano scums accumulating at the surface? (i.e., how to kill them? photorespiration?)
+
+            1.  solved this by switching out light-dependent growth to one with photoinhibition - check
+
+        5.  what to do about taxa dying off altogether?
+
+            1.  maybe have a "seed bank" where there can't be fewer than 1 individual per PFT per depth (that individual is always saved to potentially repopulate)
+
+    6.  Edit "growth" function
+
+        1.  temperature-dependent growth rate, adapted from AED; probability of doubling is determined by temperature - check
+
+        2.  add light column to environment; this will be calculated based on some incoming SWR and some Kd - check
+
+        3.  light-dependent growth rate, adapted from AED; probability of doubling is determined by maximum (or minimum? or multiplied?) probability between temp and light functions - check
+
+    7.  Introduce environment that varies over time
+
+        1.  use GLM-AED output to update water temperature, density, and light (?) once per hour
+
+            1.  plot EXO data for 2021-06-01 to 2021-09-30 at 1.6 m - check
+
+            2.  plot FP data for 2021-06-01 to 2021-09-30 at 1.6 m - check
+
+            3.  get GLM-AED output for 2021-06-01 to 2021-09-30 - check
+
+            4.  plot GLM-AED water temperature, chl-a, and three groups at 1.6 m - check
+
+            5.  calculate RMSE of GLM-AED of chl-a at 1.6 m for 2021-06-01 to 2021-09-30 - check
+
+            6.  decide what time period to calibrate, then validate (a 48-hr period; should include an FP cast) - check
+
+                1.  calibrate on 2021-08-09; validate on 2021-08-16
+
+            7.  revise model code to pull in GLM-AED output to update water temperature profiles - check
+
+        2.  goal of running for 12-24 hr, depending on run times
+
+            1.  try from 5 a.m. to 8 p.m. so SWR is not 0 for this initial testing
+
+    8.  Calibrate model
+
+        1.  stick w/ manual calibration for now, calibrated to EXO data FIRST, then FP profile data SECOND
+
+            1.  write plot to get timeseries of chl-a and "total biomass" at 1.6 m from IBM output, GLM-AED output, EXO, and FP (total - crypto); this is Panel A for proposal
+
+                1.  use multiplier to convert total biomass (FP) to chl-a (EXO); this can be tuned
+
+            2.  write code to calculate RMSE of total chl-a at 1.6 m from IBM compared to EXO as well as FP total - cryptos
+
+            3.  write plot to get depth profile of three groups (brown algae, cyanos, green algae) from IBM output and FP
+
+            4.  write code to calculate RMSE of each group at all depths (or maybe just every meter?) compared to FP
+
+            5.  calibrate on day 1, then run day 2
+
+    9.  Plot for proposal
+
+        1.  panel A: timeseries of EXO, FP, GLM-AED chl-a, IBM "total", and IBM chl-a
+
+        2.  panel B: depth profile of brown algae, green algae, and cyano comparing IBM to FP
