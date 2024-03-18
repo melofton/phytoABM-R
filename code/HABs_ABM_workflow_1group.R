@@ -29,32 +29,41 @@ lake_env <- initialize_env(depths = lake_depths)
 ## define traits for PFTs
 traits_lst <- list(
   #create cell diameter trait
-  diam = 20, #um
+  diam = 20, #um; not sure how to do this for filaments
   
   #create cell density trait
-  dens = 1050, # In range for green algae
+  dens = 950, # In range for cyanobacteria
   
   #create cell shape trait
-  shape = 1, # make them all spherical for now
+  shape = 1, # this represents spherical and we need filament eventually
   
-  #create temperature sensitivity traits
-  Tmin = c(4),
-  Topt = c(23),
-  Tmax = c(30),
-  I_S = c(300)
+  #create temperature and light sensitivity traits
+  # Tmin = c(4),
+  # Topt = c(23),
+  # Tmax = c(30),
+  T_0 = c(22), # optimal temperature for Anabaena Prokopkin et al. https://doi.org/10.1016/j.ecolmodel.2005.05.011
+  q = c(5), # thermal dispersion for Anabaena Prokopkin et al. https://doi.org/10.1016/j.ecolmodel.2005.05.011
+  I_S = c(300),
+  
+  #create maximum growth rate trait
+  umax = 0.78/1440, #maximum specific growth rate for Anabaena reported in Reynolds 2006
+  
+  #respiration traits
+  R_resp = 0.08/1440, #this is from Cayelan/Kamilla's GLM-AED calibration converted to minute scale
+  theta_resp = 1.08
 )
 
 
 # ---- Start the simulation 
 env <- lake_env$env_init
 ts         <- 0;
-time_steps <- 60*72;
+time_steps <- 60*163;
 inds_hist  <- NULL;
 start_time <- Sys.time()
 while(ts < time_steps){
   inds            <- movement(inds, env); 
   inds            <- growth(inds, repr_col = 7, traits = traits_lst, growth_env = env);
-  inds            <- death(inds);
+  inds            <- death(inds, traits = traits_lst);
   ts              <- ts + 1; 
   env             <- update_env(env, lake_env$wtemp, lake_env$swr, time_steps = time_steps, tstep = ts, depths = lake_depths);
   inds_hist[[ts]] <- inds;
@@ -98,12 +107,12 @@ plot_yloc <- data.frame(ind_yloc) %>%
   mutate(Depth_m = as.double(substring(Depth_m, 2)))
 
 plot_ts <- plot_yloc %>%
-  filter(Depth_m >= 0.1 & Depth_m <= 2) %>%
+  filter(Depth_m <= 1) %>%
   group_by(timestep) %>%
   summarize(surface_agents = mean(num_agents))
 
 # #Write output to file for plotting for proposal
-write.csv(plot_yloc, file = "./model_output/ABM_depthByTimestep_47hr.csv", row.names = FALSE)
-write.csv(plot_ts, file = "./model_output/ABM_surfaceTimeseries_47hr.csv", row.names = FALSE)
+write.csv(plot_yloc, file = "./model_output/ABM_depthByTimestep_163hr.csv", row.names = FALSE)
+write.csv(plot_ts, file = "./model_output/ABM_surfaceTimeseries_163hr.csv", row.names = FALSE)
 
-saveRDS(inds_hist, file = "./model_output/ABM_output_47hr.rds")
+saveRDS(inds_hist, file = "./model_output/ABM_output_163hr.rds")
