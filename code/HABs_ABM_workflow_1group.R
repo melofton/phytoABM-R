@@ -22,7 +22,7 @@ lake_depths <- seq(from = 0.1, to = 9.3, by = 0.1)
 inds <- initialize_phytos(depths = lake_depths)
 
 # ----- Initialise environment (water temperature)
-lake_env <- initialize_env(depths = lake_depths)
+lake_env <- initialize_env(depths = lake_depths, n_days = 14)
 
 
 # ---- Assign traits
@@ -57,15 +57,15 @@ traits_lst <- list(
 # ---- Start the simulation 
 env <- lake_env$env_init
 ts         <- 0;
-time_steps <- 60*163;
+time_steps <- 60*330;
 inds_hist  <- NULL;
 start_time <- Sys.time()
 while(ts < time_steps){
-  inds            <- movement(inds, env); 
+  inds            <- movement(inds, env, yloc = 2, ymax = 9.3, wnd = unname(env[1,6]), delta_z = 9); 
   inds            <- growth(inds, repr_col = 7, traits = traits_lst, growth_env = env);
   inds            <- death(inds, traits = traits_lst);
   ts              <- ts + 1; 
-  env             <- update_env(env, lake_env$wtemp, lake_env$swr, time_steps = time_steps, tstep = ts, depths = lake_depths);
+  env             <- update_env(env, lake_env$wtemp, lake_env$met, time_steps = time_steps, tstep = ts, depths = lake_depths);
   inds_hist[[ts]] <- inds;
   print(ts)
   print(length(inds[,1]))
@@ -78,8 +78,11 @@ print(run_time)
 
 
 # =============================================================================
-# Print the results
+# Wrangle and save the results
 # =============================================================================
+
+# load in previous model run if desired
+inds_hist <- readRDS("./model_output/ABM_output_330hr.rds")
 
 ind_yloc <- array(data = NA, dim = c(time_steps,length(lake_depths)+1))
 colnames(ind_yloc) <- c("timestep",lake_depths)
@@ -92,27 +95,20 @@ for(i in 1:time_steps){
     ind_yloc[i, j+1] <- length(inds_hist[[i]][which(round(inds_hist[[i]][,2],1) == round(lake_depths[j],1) & inds_hist[[i]][,1] == 1),1]); # Save the number of individuals at each depth
   }
 }
+
 #print(ind_yloc);
 
-
-
-
-# =============================================================================
-# Wrangle and save the results
-# =============================================================================
-
-##plot IBM output
+##dataframes for plotting
 plot_yloc <- data.frame(ind_yloc) %>%
   gather(X0.1:X9.3, key = "Depth_m",value = "num_agents") %>%
   mutate(Depth_m = as.double(substring(Depth_m, 2)))
 
 plot_ts <- plot_yloc %>%
-  filter(Depth_m <= 1) %>%
   group_by(timestep) %>%
-  summarize(surface_agents = mean(num_agents))
+  summarize(surface_agents = sum(num_agents))
 
-# #Write output to file for plotting for proposal
-write.csv(plot_yloc, file = "./model_output/ABM_depthByTimestep_163hr.csv", row.names = FALSE)
-write.csv(plot_ts, file = "./model_output/ABM_surfaceTimeseries_163hr.csv", row.names = FALSE)
+# #Write output to file for plotting 
+write.csv(plot_yloc, file = "./model_output/ABM_depthByTimestep_330hr.csv", row.names = FALSE)
+write.csv(plot_ts, file = "./model_output/ABM_agentTimeseries_330hr.csv", row.names = FALSE)
 
-saveRDS(inds_hist, file = "./model_output/ABM_output_163hr.rds")
+saveRDS(inds_hist, file = "./model_output/ABM_output_330hr.rds")

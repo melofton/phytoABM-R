@@ -7,7 +7,7 @@
 # =============================================================================
 # Movement function
 # =============================================================================
-movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = 3){
+movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9){
   
   total_inds <- dim(inds)[1]
   
@@ -16,8 +16,8 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = 3){
   cell_shape <- inds[,5] # Get the cell shapes of all individuals
   
   #calculate water density (Kell, 1975, eq. 16); need to replace this with water.density function from rLakeAnalyzer https://github.com/GLEON/rLakeAnalyzer/blob/master/R/water.density.R
-  env[,3] <- (999.83952 + 16.945176*env[,1] - 0.0079870401*env[,1]^2 - 0.000046170461*env[,1]^3 + 0.00000010556302*env[,1]^4 - 0.00000000028054253*env[,1]^5) / (1 + 0.016879850*env[,1]) #Kell equation for water density (Kell, 1975)
-  
+  env[,3] <- water.density(wtr = env[,1], sal = env[,1]*0)
+
   #calculate water viscosity (Kestin et al. 1978, eq. 15)
   env[,4] <- (10^(((20 - env[,1])/(env[,1] + 96))*(1.2364 - 0.00137*(20 - env[,1]) + 0.0000057*(20 - env[,1])^2)))*1000 #this actually calculates the ratio of viscosity at target temp/viscosity at 20 degrees C, but viscosity at 20 degrees C is ~ 1
   
@@ -32,10 +32,10 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = 3){
   #loop through and calculate individual movement
   for(j in 1:total_inds){
     
-    curr_dens <- env[which(env[,2] == round(inds[j,2],1)),3]
-    curr_visc <- env[which(env[,2] == round(inds[j,2],1)),4]
+    # curr_dens <- env[which(env[,2] == round(inds[j,2],1)),3]
+    # curr_visc <- env[which(env[,2] == round(inds[j,2],1)),4]
     
-    w_s <- -0.13/1440 #this is what's in Cayelan/Kamilla's GLM-AED calibration for cyanobacteria at FCR converted to meters per minute instead of per day
+    w_s <- 0.13/1440 #this is what's in Cayelan/Kamilla's GLM-AED calibration for cyanobacteria at FCR converted to meters per minute instead of per day
     # w_s <- ((9.8081*cell_diam[j]^2*(cell_dens[j] - curr_dens))/(18*cell_shape[j]*curr_visc))/100000 # Define the cell velocity given cell diameter, density, and shape
     
     
@@ -47,7 +47,7 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = 3){
     #specify K (vertical eddy diffusivity) following Lizon et al 1998 https://www.int-res.com/articles/meps/169/m169p043.pdf
 
     K = 0.4*u_star*ymax*((ymax - z)/ymax)*(1-((ymax - z)/ymax)) + 0.00001
-    
+
     #specify K_prime
     K_prime = 0.4 * u_star * ymax * ((ymax - z)/ymax) * (1/ymax) - 0.4 * u_star * 
       ymax * (1/ymax) * (1 - ((ymax - z)/ymax))
@@ -63,12 +63,15 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = 3){
     #######################################################
     
     #specify random walk following Visser 1997 https://www.int-res.com/articles/meps/158/m158p275.pdf
-    elev <- ymax - z
+    # between Ross & Sharples paper and Visser 1997 paper, a lot of confusion re: what z is!
+    # is it height above sediments, or depth with a negative sign, or depth with no negative sign
+    # elev <- ymax - z
     
-    z_t1 <- elev + K_prime*elev*del_t + runif(1, min = -1,max = 1)*sqrt((2*K*(elev + 0.5*K_prime*elev*del_t)*del_t)/(1/3)) + w_s # w_s*del_t # this is needed if you use Stokes
+    z_t1 <- z + K_prime*z*del_t + runif(1, min = -0.1,max = 0.1)*sqrt((2*K*(z + 0.5*K_prime*z*del_t)*del_t)/(1/3)) + w_s # w_s*del_t # this is needed if you use Stokes
     
     ####### end test code #######################################################
-    inds[j, yloc] <- 9.3 - z_t1
+    inds[j, yloc] <- z_t1
+    inds[j, delta_z] <- z_t1 - z
     
   }
   
@@ -78,9 +81,6 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = 3){
     if(inds[i, yloc] > ymax){         # If it moved past the maximum depth
       inds[i, yloc] <- ymax;        # Then move it back to the maximum depth
     }
-    # if(inds[i, yloc] < 0.5){            # If it is close to top boundary
-    #   inds[i, yloc] <- runif(1, min = 0.1, max = 0.5);  # Create a mixed layer in top 0.5 m
-    # }
     if(inds[i, yloc] < 0.1){            # If it moved below 0.1 (above surface)
       inds[i, yloc] <- 0.1;           # Then move it back to 0.1 (surface)
     }
@@ -192,7 +192,7 @@ death <- function(inds, dcol = 6, yloc = 2, ymax = 9.3, pft = 1, traits = traits
 # ========================================================
 # Update environment function
 # ========================================================
-update_env <- function(env, wtemp, swr, time_steps = 60*2, tstep = ts, depths = lake_depths){
+update_env <- function(env, wtemp, met, time_steps = 60*2, tstep = ts, depths = lake_depths){
   
   ts = tstep
   
@@ -206,11 +206,14 @@ update_env <- function(env, wtemp, swr, time_steps = 60*2, tstep = ts, depths = 
     #update water temp column
     env[,1] <- unlist(wtemp[,col])
     
-    #calculate which row of swr we want
+    #calculate which row of swr and wnd we want
     row <- 6+ts/60
     
     #update light column
-    env[,5] <- exp(as.double(log(swr[row,2])) - 0.5*depths)
+    env[,5] <- exp(as.double(log(met[row,2])) - 0.5*depths)
+    
+    #update wind column
+    env[,6] <- unlist(met[row,3])
     
   }
   
@@ -233,7 +236,7 @@ initialize_phytos <- function(depths){
                   TotalConcNoMixed_ugL = 10)
   
   # Create inds by looping through each depth increment and then creating that number of individuals at that depth based on ug/L
-  inds <- array(data = 0, dim = c(0, 8))
+  inds <- array(data = 0, dim = c(0, 9))
   
   for(i in 1:length(depths)){
     
@@ -250,18 +253,18 @@ initialize_phytos <- function(depths){
     shape = 1 # make them all spherical for now
     
     #populate depths with traits
-    temp.df <- array(data = 0, dim = c(round(temp$TotalConcNoMixed_ugL,0),8)) # THIS IS WHERE YOU 
+    temp.df <- array(data = 0, dim = c(round(temp$TotalConcNoMixed_ugL,0),9)) # THIS IS WHERE YOU 
     # NEED TO EVENTUALLY ACCOUNT FOR LAYER VOLUME!! (MULTIPLY BY LITERS IN THAT LAYER)
     temp.df[,1] <- 1 #placeholder for taxon ID or some other trait
     temp.df[,2] <- depths[i]
     temp.df[,3] <- diam
     temp.df[,4] <- dens
     temp.df[,5] <- shape
-    
+
     inds <- rbind(inds, temp.df)
   }
   
-  colnames(inds) <- c("PFG","yloc","cell_diam","cell_dens","cell_shape","dcol","repr","light_exp")
+  colnames(inds) <- c("PFG","yloc","cell_diam","cell_dens","cell_shape","dcol","repr","light_exp","delta_z")
   
   return(inds)
 }
@@ -270,15 +273,15 @@ initialize_phytos <- function(depths){
 # Initialize environment function
 # ========================================================
 
-initialize_env <- function(depths){
+initialize_env <- function(depths, n_days){
   
-  env <- array(data = 0, dim = c(length(depths),5))
+  env <- array(data = 0, dim = c(length(depths),6))
   
+  # first column is temperature
   wtemp <- read_csv("./data/cal_wtemp_GLM.csv") 
   wtemp_depths <- wtemp[,1]
   wtemp <- wtemp[,-1]
-  n=7
-  wtemp <- do.call("cbind", replicate(n, wtemp, simplify = FALSE))
+  wtemp <- do.call("cbind", replicate(n_days, wtemp, simplify = FALSE))
   wtemp <- cbind(depths, wtemp)
   colnames(wtemp) <- c("depth",seq(1:(ncol(wtemp)-1)))
   env[,1] <- unlist(wtemp[,7])
@@ -286,15 +289,20 @@ initialize_env <- function(depths){
   # second column is depth
   env[,2] <- round(depths,1)
   
-  # fifth column is light
-  swr <- read_csv("./data/cal_met_GLM.csv")
-  n=7
-  swr <- do.call("rbind", replicate(n, swr, simplify = FALSE)) 
-  swr <- swr %>%
-    mutate(time = seq(1:nrow(swr)))
-  env[,5] <- exp(as.double(log(swr[6,2])) - 0.5*depths)
-  colnames(env) <- c("wt","yloc","dens","visc","light")
+  met <- read_csv("./data/cal_met_GLM.csv")
+  met <- do.call("rbind", replicate(n_days, met, simplify = FALSE)) 
+  met <- met %>%
+    mutate(time = seq(1:nrow(met)))
   
-  return(list(env_init = env, wtemp = wtemp, swr = swr))
+  # fifth column is light
+  Kd = 0.4 # this is from Kamilla's PEST calibrated GLM
+  env[,5] <- exp(as.double(log(met[6,2])) - Kd*depths) # get light attenuation with depth
+
+  # sixth column is wind
+  env[,6] <- unlist(met[6,3])
+  
+  colnames(env) <- c("wt","yloc","dens","visc","light","wnd")
+  
+  return(list(env_init = env, wtemp = wtemp, met = met))
   
   }

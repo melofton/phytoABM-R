@@ -198,13 +198,13 @@ cal_wtemp2[93,c(2:25)] <- cal_wtemp2[92,c(2:25)]
 write.csv(cal_wtemp2, file = "./HABs-ABM/data/cal_wtemp_GLM.csv",row.names = FALSE)
 
 ##Get met data ----
-met <- read_csv("./Eco-KGML/data/predictors/met_avg_filtered.csv") %>%
-  select(time, ShortWave) %>%
+met <- read_csv("./data/met_avg_filtered.csv") %>%
+  select(time, ShortWave, WindSpeed) %>%
   filter(date(time) == "2021-08-09")
 met[6,2] <- (met[5,2]+met[7,2])/2
 met[20,2] <- (met[19,2]+met[21,2])/2
 
-write.csv(met, file = "./HABs-ABM/data/cal_met_GLM.csv",row.names = FALSE)
+write.csv(met, file = "./data/cal_met_GLM.csv",row.names = FALSE)
 
 ##Statistics ----
 
