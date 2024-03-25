@@ -52,3 +52,40 @@ agents_ts
 
 ggsave(agents_ts, filename = "./plot_output/agent_timeseries_1pft.tif",height = 3, width = 10,
        units = "in", dpi = 300, dev = "tiff")
+
+# get distribution of vertical movement over time
+inds_hist <- readRDS("./model_output/ABM_output_330hr.rds")
+
+lake_depths <- seq(from = 0.1, to = 9.3, by = 0.1)
+time_steps <- 60*330;
+
+ind_zmove <- array(data = NA, dim = c(time_steps,length(lake_depths)+1))
+colnames(ind_zmove) <- c("timestep",lake_depths)
+
+for(i in 1:time_steps){
+  for(j in 1:length(lake_depths)){
+    
+    #generic PFT
+    ind_zmove[i, 1] <- i;                      # Save the time step
+    ind_zmove[i, j+1] <- mean(inds_hist[[i]][which(round(inds_hist[[i]][,2],1) == round(lake_depths[j],1) & inds_hist[[i]][,1] == 1),9], na.rm = TRUE); # Save the number of individuals at each depth
+  }
+}
+
+#print(ind_yloc);
+
+##dataframes for plotting
+plot_zmove <- data.frame(ind_zmove) %>%
+  gather(X0.1:X9.3, key = "Depth_m",value = "mean_zmove") %>%
+  mutate(Depth_m = as.double(substring(Depth_m, 2))) %>%
+  group_by(Depth_m) %>%
+  summarize(grand_mean_zmove = mean(mean_zmove, na.rm = TRUE))
+
+zmove_plot <- ggplot(data = plot_zmove, aes(x = Depth_m, y = grand_mean_zmove))+
+  geom_bar(stat = "identity", color = "darkblue", fill = "lightblue")+
+  xlab("Depth (m)")+
+  ylab("Average vertical distance moved")+
+  theme_classic()
+zmove_plot
+
+ggsave(zmove_plot, filename = "./plot_output/mean_zmove.tif",height = 3, width = 4,
+       units = "in", dpi = 300, dev = "tiff")

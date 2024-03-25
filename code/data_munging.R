@@ -12,9 +12,50 @@ library(data.table)
 ##Data download----
 options(timeout = 1000)
 #download FP data from EDI 
-data  <- "https://portal.edirepository.org/nis/dataviewer?packageid=edi.272.6&entityid=6b3151c0fdd913e02641363c2b00ae57"
+inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/272/8/0359840d24028e6522f8998bd41b544e" 
+infile1 <- tempfile()
+try(download.file(inUrl1,infile1,method="curl"))
+if (is.na(file.size(infile1))) download.file(inUrl1,infile1,method="auto")
+dt1 <-read.csv(infile1,header=F 
+               ,skip=1
+               ,sep=","  
+               , col.names=c(
+                 "Reservoir",     
+                 "Site",     
+                 "DateTime",     
+                 "CastID",     
+                 "Depth_m",     
+                 "GreenAlgae_ugL",     
+                 "Bluegreens_ugL",     
+                 "BrownAlgae_ugL",     
+                 "MixedAlgae_ugL",     
+                 "TotalConc_ugL",     
+                 "YellowSubstances_ugL",     
+                 "Temp_C",     
+                 "Transmission_perc",     
+                 "RFU_370nm",     
+                 "RFU_470nm",     
+                 "RFU_525nm",     
+                 "RFU_570nm",     
+                 "RFU_590nm",     
+                 "RFU_610nm",     
+                 "Flag_GreenAlgae_ugL",     
+                 "Flag_Bluegreens_ugL",     
+                 "Flag_BrownAlgae_ugL",     
+                 "Flag_MixedAlgae_ugL",     
+                 "Flag_YellowSubstances_ugL",     
+                 "Flag_TotalConc_ugL",     
+                 "Flag_Temp_C",     
+                 "Flag_Transmission_perc",     
+                 "Flag_RFU_525nm",     
+                 "Flag_RFU_570nm",     
+                 "Flag_RFU_610nm",     
+                 "Flag_RFU_370nm",     
+                 "Flag_RFU_590nm",     
+                 "Flag_RFU_470nm"    ), check.names=TRUE)
 
-download.file(data,destfile = "./HABs-ABM/data/FluoroProbe_2014_2021.csv", method='libcurl')
+unlink(infile1)
+write.csv(dt1, "./data/FluoroProbe_2014_2023.csv", row.names = FALSE)
 
 #download EXO data from EDI 
 data  <- "https://portal.edirepository.org/nis/dataviewer?packageid=edi.271.7&entityid=71e6b946b751aa1b966ab5653b01077f"
