@@ -175,7 +175,7 @@ library(lubridate)
 glm_version() 
 
 # Set nml file name
-sim_folder <- paste0("./Eco-KGML/data") 
+sim_folder <- paste0("/Users/MaryLofton/RProjects/FCR-phyto-modeling/Eco-KGML-transfer-learning/data/data_raw/ModelOutputFCR") 
 nc_file <- file.path(sim_folder, 'output.nc') 
 
 # Get vars

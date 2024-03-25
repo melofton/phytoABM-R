@@ -108,6 +108,10 @@ growth <- function(inds, repr_col = 7, traits = traits_lst, growth_env = env){
   q = traits$q
   I_S = traits$I_S
   umax = traits$umax
+  N_0 = traits$N_0
+  K_N = traits$K_N
+  P_0 = traits$P_0
+  K_P = traits$K_P
   
   ###Temp-dependent growth
   for(i in 1:total_inds){
@@ -125,8 +129,15 @@ growth <- function(inds, repr_col = 7, traits = traits_lst, growth_env = env){
       #light-dependent growth with photoinhibition (Steele 1962) https://doi.org/10.4319/lo.1962.7.2.0137
       fI = (SWR/I_S) * exp(1 - (SWR/I_S))
       if(SWR < 5e-5 | fI < 5e-5){fI = 0.0}
+      
+      #nutrient dependent growth (Monod model) for DIN
+      fN = (DIN - N_0) / (DIN - N_0 + K_N)
+      
+      #nutrient dependent growth (Monod model) for FRP
+      fP = (FRP - P_0) / (FRP - P_0 + K_P)
+      
     
-    inds[i, repr_col] <- rbinom(n = 1, size = 1, prob = umax*fT*fI)
+    inds[i, repr_col] <- rbinom(n = 1, size = 1, prob = umax*min(c(fT,fI,fN,fP)))
     
   }
   
