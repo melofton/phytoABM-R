@@ -119,6 +119,8 @@ growth <- function(inds, repr_col = 7, traits = traits_lst, growth_env = env){
     #get water temp and SWR where individual is located
     TEMP <- env[which(env[,2] == round(inds[i,2],1)),1]
     SWR <- env[which(env[,2] == round(inds[i,2],1)),5]
+    DIN <- env[which(env[,2] == round(inds[i,2],1)),7]
+    FRP <- env[which(env[,2] == round(inds[i,2],1)),8]
     
 
       #temp-dependent growth following Hellweger et al. 2008 https://aslopubs.onlinelibrary.wiley.com/doi/epdf/10.4319/lo.2008.53.4.1227?src=getftr
@@ -203,7 +205,7 @@ death <- function(inds, dcol = 6, yloc = 2, ymax = 9.3, pft = 1, traits = traits
 # ========================================================
 # Update environment function
 # ========================================================
-update_env <- function(env, wtemp, met, time_steps = 60*2, tstep = ts, depths = lake_depths){
+update_env <- function(env, wtemp, met, din, frp, time_steps = 60*2, tstep = ts, depths = lake_depths){
   
   ts = tstep
   
@@ -225,6 +227,12 @@ update_env <- function(env, wtemp, met, time_steps = 60*2, tstep = ts, depths = 
     
     #update wind column
     env[,6] <- unlist(met[row,3])
+    
+    #update din column
+    env[,7] <- unlist(din[,col])
+    
+    #update frp column
+    env[,8] <- unlist(frp[,col])
     
   }
   
@@ -286,7 +294,7 @@ initialize_phytos <- function(depths){
 
 initialize_env <- function(depths, n_days){
   
-  env <- array(data = 0, dim = c(length(depths),6))
+  env <- array(data = 0, dim = c(length(depths),8))
   
   # first column is temperature
   wtemp <- read_csv("./data/cal_wtemp_GLM.csv") 
@@ -312,8 +320,26 @@ initialize_env <- function(depths, n_days){
   # sixth column is wind
   env[,6] <- unlist(met[6,3])
   
-  colnames(env) <- c("wt","yloc","dens","visc","light","wnd")
+  # seventh column is din
+  din <- read_csv("./data/cal_din_GLM.csv") 
+  din_depths <- din[,1]
+  din <- din[,-1]
+  din <- do.call("cbind", replicate(n_days, din, simplify = FALSE))
+  din <- cbind(depths, din)
+  colnames(din) <- c("depth",seq(1:(ncol(din)-1)))
+  env[,7] <- unlist(din[,7])
   
-  return(list(env_init = env, wtemp = wtemp, met = met))
+  # eighth column is frp
+  frp <- read_csv("./data/cal_frp_GLM.csv") 
+  frp_depths <- frp[,1]
+  frp <- frp[,-1]
+  frp <- do.call("cbind", replicate(n_days, frp, simplify = FALSE))
+  frp <- cbind(depths, frp)
+  colnames(frp) <- c("depth",seq(1:(ncol(frp)-1)))
+  env[,8] <- unlist(frp[,7])
+  
+  colnames(env) <- c("wt","yloc","dens","visc","light","wnd","din","frp")
+  
+  return(list(env_init = env, wtemp = wtemp, met = met, din = din, frp = frp))
   
   }

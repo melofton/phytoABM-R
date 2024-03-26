@@ -175,13 +175,13 @@ library(lubridate)
 glm_version() 
 
 # Set nml file name
-sim_folder <- paste0("/Users/MaryLofton/RProjects/FCR-phyto-modeling/Eco-KGML-transfer-learning/data/data_raw/ModelOutputFCR") 
+sim_folder <- paste0("~/RProjects/FCR-phyto-modeling/Eco-KGML-transfer-learning/data/data_raw/ModelOutputFCR") 
 nc_file <- file.path(sim_folder, 'output.nc') 
 
 # Get vars
-#sim_vars(nc_file)
-depths = 1.6
-vars = c("temp","PHY_tchla","PHY_tphy","PHY_green","PHY_diatom","PHY_cyano")
+all_vars <- sim_vars(nc_file)
+depths = seq(from = 0.1, to = 9.3, by = 0.1)
+vars = c("temp","NIT_amm","NIT_nit","PHS_frp")
 
 var <- get_var(nc_file, var_name = vars[1], reference="surface", z_out=depths) %>%
   filter(year(DateTime) == 2021 & month(DateTime) %in% c(6:9)) 
@@ -219,24 +219,60 @@ ggplot(data = GLM_day, aes(x = DateTime, y = mmolCm3, group = pft, color = pft))
   geom_line()+
   theme_bw()
 
-#Pull water temp profiles for calibration date (2021-08-09)
+#Pull water temp and nutrient profiles for calibration date (2021-08-09)
+glm_out <- read_csv("./data/GLM_output_summer_2021.csv")
+colnames(glm_out)
+
 depths <- seq(from = 0.1, to = 9.3, by = 0.1)
 
 wtemp <- get_var(nc_file, var_name = "temp", reference="surface", z_out=depths) %>%
   filter(date(DateTime) == "2021-08-09")
 
-cal_wtemp <- wtemp %>%
-  gather(temp_0.1:temp_9.3, key = "Depth_m", value = "Temp_C") %>%
-  separate(Depth_m, sep = "_", c("var","depth")) %>%
-  select(-var)
+cal_vars <- glm_out %>%
+  gather(temp_0.1:PHS_frp_9.3, key = "VarDepth", value = "value") %>%
+  separate(VarDepth, sep = "_", c("var1","var2","depth")) %>%
+  filter(date(DateTime) == "2021-08-09")
 
-cal_wtemp2 <- cal_wtemp %>%
+cal_vars2 <- cal_vars %>%
+  mutate(depth = ifelse(var1 == "temp",var2,depth))
+cal_vars3 <- cal_vars2 %>%
+  mutate(var2 = ifelse(var1 == "temp",var1,var2))
+cal_vars4 <- cal_vars3 %>%
+  select(-var1) %>%
+  rename(Variable = var2,
+         Depth_m = depth,
+         Value = value)
+
+write.csv(cal_vars4, "./data/cal_allVars_GLM.csv",row.names = FALSE)
+
+cal_vars4 <- read_csv("./data/cal_allVars_GLM.csv")
+
+cal_wtemp <- cal_vars4 %>%
+  filter(Variable == "temp") %>%
+  mutate(hour = hour(DateTime)) %>%
+  select(-DateTime, -Variable) %>%
+  spread(key = hour, value = Value) 
+cal_wtemp[93,c(2:25)] <- cal_wtemp[92,c(2:25)]
+write.csv(cal_wtemp, file = "./data/cal_wtemp_GLM.csv",row.names = FALSE)
+
+cal_nit <- cal_vars4 %>%
+  filter(Variable %in% c("amm","nit")) %>%
+  pivot_wider(names_from = "Variable", values_from = "Value") %>%
+  mutate(DIN = nit + amm) %>%
+  select(-nit, -amm) %>%
   mutate(hour = hour(DateTime)) %>%
   select(-DateTime) %>%
-  spread(key = hour, value = Temp_C)
-cal_wtemp2[93,c(2:25)] <- cal_wtemp2[92,c(2:25)]
+  spread(key = hour, value = DIN)
+cal_nit[93,c(2:25)] <- cal_nit[92,c(2:25)]
+write.csv(cal_nit, file = "./data/cal_din_GLM.csv",row.names = FALSE)
 
-write.csv(cal_wtemp2, file = "./HABs-ABM/data/cal_wtemp_GLM.csv",row.names = FALSE)
+cal_frp <- cal_vars4 %>%
+  filter(Variable == "frp") %>%
+  mutate(hour = hour(DateTime)) %>%
+  select(-DateTime, -Variable) %>%
+  spread(key = hour, value = Value)
+cal_frp[93,c(2:25)] <- cal_frp[92,c(2:25)]
+write.csv(cal_frp, file = "./data/cal_frp_GLM.csv",row.names = FALSE)
 
 ##Get met data ----
 met <- read_csv("./data/met_avg_filtered.csv") %>%

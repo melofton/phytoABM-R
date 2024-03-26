@@ -50,7 +50,13 @@ traits_lst <- list(
   
   #respiration traits
   R_resp = 0.08/1440, #this is from Cayelan/Kamilla's GLM-AED calibration converted to minute scale
-  theta_resp = 1.08
+  theta_resp = 1.08,
+  
+  #nutrient uptake traits
+  K_N = 2,
+  N_0 = 0,
+  K_P = 0.05,
+  P_0 = 0
 )
 
 
@@ -65,7 +71,7 @@ while(ts < time_steps){
   inds            <- growth(inds, repr_col = 7, traits = traits_lst, growth_env = env);
   inds            <- death(inds, traits = traits_lst);
   ts              <- ts + 1; 
-  env             <- update_env(env, lake_env$wtemp, lake_env$met, time_steps = time_steps, tstep = ts, depths = lake_depths);
+  env             <- update_env(env, lake_env$wtemp, lake_env$met, lake_env$din, lake_env$frp, time_steps = time_steps, tstep = ts, depths = lake_depths);
   inds_hist[[ts]] <- inds;
   print(ts)
   print(length(inds[,1]))
