@@ -58,6 +58,30 @@ par(cex.lab = 1.5, mgp = c(2.7,1,0))
 curve(f4(x,R_resp = R_resp, theta_resp = theta_resp),from=4, to=30,ylab='Probability of death',xlab = 'Water temperature (°C)')
 dev.off()
 
+f5 <- function(DIN, N_0, K_N){
+  y = (DIN - N_0) / (DIN - N_0 + K_N)
+}
+K_N = 2
+N_0 = 0
+
+jpeg("./plot_output/DIN_eq.jpeg", res = 300, width = 5, height = 3.5, units = "in")
+par(cex.lab = 1.5, mgp = c(2.7,1,0))
+curve(f5(x, N_0 = N_0, K_N = K_N),from=0, to=60,ylab='fN',xlab = expression(paste("DIN"," (",mu,"mol N ",m^-3,")")),ylim = c(0,1))
+dev.off()
+
+f6 <- function(FRP, P_0, K_P){
+  y = (FRP - P_0) / (FRP - P_0 + K_P)
+}
+K_P = 0.05
+P_0 = 0
+
+jpeg("./plot_output/FRP_eq.jpeg", res = 300, width = 5, height = 3.5, units = "in")
+par(cex.lab = 1.5, mgp = c(2.7,1,0))
+curve(f6(x, P_0 = P_0, K_P = K_P),from=0, to=0.1,ylab='fP',xlab = expression(paste("FRP"," (",mu,"mol P ",m^-3,")")),ylim = c(0,1))
+dev.off()
+
+
+
 
 
 

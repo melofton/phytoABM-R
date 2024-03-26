@@ -14,8 +14,10 @@ library(rLakeAnalyzer)
 
 # read in and wrangle data
 
-#GLM temperature and shortwave
+#GLM temperature, met, and nutrients
 temp <- read_csv("./data/cal_wtemp_GLM.csv")
+din <- read_csv("./data/cal_din_GLM.csv")
+frp <- read_csv("./data/cal_frp_GLM.csv")
 
 met <- read_csv("./data/cal_met_GLM.csv") %>%
   mutate(Hour = hour(time))
@@ -196,4 +198,90 @@ K_heatmap <- function(temp_data = temp, wnd, ymax){
 K_plot <- K_heatmap(temp_data = temp, wnd, ymax)
 ggsave(K_plot, filename = "./plot_output/K_environment.png", device = "png",
        width = 6, height = 4, units = "in")
+
+# plotting functions
+din_heatmap <- function(din_data, temp_data){
+  
+  #wrangle final dataframe for plotting
+  # Re-arrange the data frame by date
+  din_new <- din_data %>%
+    pivot_longer(`0`:`23`, names_to = "Hour", values_to = "DIN") %>%
+    mutate(Hour = as.numeric(Hour))
+  
+  td <- temp_data %>%
+    mutate(across(`0`:`23`, ~ thermo.depth(.x,depths = Depth_m))) %>%
+    first() %>%
+    select(-Depth_m) %>%
+    pivot_longer(`0`:`23`,names_to = "hour", values_to = "thermo.depth.m") %>%
+    mutate(hour = as.numeric(hour))
+  
+  interp <- akima::interp(x=din_new$Hour, y = din_new$Depth_m, z = din_new$DIN,
+                          xo = seq(min(din_new$Hour), max(din_new$Hour), by = 0.1), 
+                          yo = seq(min(din_new$Depth_m), max(din_new$Depth_m), by = 0.01),
+                          extrap = T, linear = T, duplicate = "strip")
+  interp <- akima::interp2xyz(interp, data.frame=T)
+  
+  fig_title <- "GLM-AED modeled DIN output for 2021-08-09"
+  
+  p1 <- ggplot()+
+    geom_raster(data = interp, aes(x=x, y=y, fill = z))+
+    geom_line(data = td, aes(x=hour, y = thermo.depth.m, color = "Thermocline"), linewidth = 1)+
+    scale_y_reverse(expand = c(0,0))+
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_fill_gradientn(colours = colorRamps::blue2green2red(60), na.value="gray")+
+    scale_color_manual(values = c("Thermocline" = "black"), name = "")+
+    labs(x = "Hour of day", y = "Depth (m)", title = fig_title,fill='DIN (mmol N m-3)')+
+    theme_bw()
+  
+  print(p1)
+  
+}
+
+din_plot <- din_heatmap(din_data = din, temp_data = temp)
+ggsave(din_plot, filename = "./plot_output/din_environment.png", device = "png",
+       width = 6, height = 4, units = "in")
+
+# plotting functions
+frp_heatmap <- function(frp_data, temp_data){
+  
+  #wrangle final dataframe for plotting
+  # Re-arrange the data frame by date
+  frp_new <- frp_data %>%
+    pivot_longer(`0`:`23`, names_to = "Hour", values_to = "FRP") %>%
+    mutate(Hour = as.numeric(Hour))
+  
+  td <- temp_data %>%
+    mutate(across(`0`:`23`, ~ thermo.depth(.x,depths = Depth_m))) %>%
+    first() %>%
+    select(-Depth_m) %>%
+    pivot_longer(`0`:`23`,names_to = "hour", values_to = "thermo.depth.m") %>%
+    mutate(hour = as.numeric(hour))
+  
+  interp <- akima::interp(x=frp_new$Hour, y = frp_new$Depth_m, z = frp_new$FRP,
+                          xo = seq(min(frp_new$Hour), max(frp_new$Hour), by = 0.1), 
+                          yo = seq(min(frp_new$Depth_m), max(frp_new$Depth_m), by = 0.01),
+                          extrap = T, linear = T, duplicate = "strip")
+  interp <- akima::interp2xyz(interp, data.frame=T)
+  
+  fig_title <- "GLM-AED modeled FRP output for 2021-08-09"
+  
+  p1 <- ggplot()+
+    geom_raster(data = interp, aes(x=x, y=y, fill = z))+
+    geom_line(data = td, aes(x=hour, y = thermo.depth.m, color = "Thermocline"), linewidth = 1)+
+    scale_y_reverse(expand = c(0,0))+
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_fill_gradientn(colours = colorRamps::blue2green2red(60), na.value="gray")+
+    scale_color_manual(values = c("Thermocline" = "black"), name = "")+
+    labs(x = "Hour of day", y = "Depth (m)", title = fig_title,fill='FRP (mmol P m-3)')+
+    theme_bw()
+  
+  print(p1)
+  
+}
+
+frp_plot <- frp_heatmap(frp_data = frp, temp_data = temp)
+ggsave(frp_plot, filename = "./plot_output/frp_environment.png", device = "png",
+       width = 6, height = 4, units = "in")
+
+
 
