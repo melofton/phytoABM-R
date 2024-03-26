@@ -7,7 +7,7 @@
 # =============================================================================
 # Movement function
 # =============================================================================
-movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9){
+movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9, depths){
   
   total_inds <- dim(inds)[1]
   
@@ -21,14 +21,40 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9){
   #calculate water viscosity (Kestin et al. 1978, eq. 15)
   env[,4] <- (10^(((20 - env[,1])/(env[,1] + 96))*(1.2364 - 0.00137*(20 - env[,1]) + 0.0000057*(20 - env[,1])^2)))*1000 #this actually calculates the ratio of viscosity at target temp/viscosity at 20 degrees C, but viscosity at 20 degrees C is ~ 1
   
+  #calculate buoyancy frequency (rLakeAnalyzer)
+  buoyancy_freq <- buoyancy.freq(wtr = env[,1], depths = lake_depths)
+  env[,10] <- c(first(buoyancy_freq),buoyancy_freq)
+  
+  #calculate N
+  N <- sqrt(env[,10]) 
+  
+  #specify K (vertical eddy diffusivity) follow Yeates & Imberger 1994 eq 5
+  K <- NULL
+  
+  for(i in 1:length(N)){
+    if(N[i] == 0){
+      K[i] = 1e-2
+    } else {
+      K[i] = 0.0000000000049 * ((9.80665*281.0694) / N[i])  #Area in km2 is 0.079 and we convert to square meters take the square root of that
+      
+    }
+  }
+  
+  K_prime = c(first(diff(K)),diff(K))
+  
+  K_df <- data.frame(depth = as.numeric(depths),
+                     K = K,
+                     K_prime = K_prime)
+  K_df <- tibble(K_df)
+  
   #specify model timestep
   del_t = 60 #in seconds
   
-  #calculate u_star (shear velocity)
-  td = thermo.depth(wtr = env[,1], depths = env[,2])
-  avgEpiDense = mean(env[which(env[,2] <= td),3])
-  u_star = uStar(wndSpeed = wnd, wndHeight = 3, averageEpiDense = avgEpiDense)
-  
+  # #calculate u_star (shear velocity)
+  # td = thermo.depth(wtr = env[,1], depths = env[,2])
+  # avgEpiDense = mean(env[which(env[,2] <= td),3])
+  # u_star = uStar(wndSpeed = wnd, wndHeight = 3, averageEpiDense = avgEpiDense)
+  # 
   #loop through and calculate individual movement
   for(j in 1:total_inds){
     
@@ -42,32 +68,16 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9){
     ####### Attempt at random walk ###############################################
     
     #pull individual's depth
-    z <- inds[j, yloc]
-    
-    #specify K (vertical eddy diffusivity) following Lizon et al 1998 https://www.int-res.com/articles/meps/169/m169p043.pdf
-
-    K = 0.4*u_star*ymax*((ymax - z)/ymax)*(1-((ymax - z)/ymax)) + 0.00001
-
-    #specify K_prime
-    K_prime = 0.4 * u_star * ymax * ((ymax - z)/ymax) * (1/ymax) - 0.4 * u_star * 
-      ymax * (1/ymax) * (1 - ((ymax - z)/ymax))
-    
-    ## calculation of K_prime ################
-    # f = expression(0.4*u_star*ymax*((ymax - z)/ymax)*(1-((ymax - z)/ymax)) + 0.00001)
-    # K_prime = D(f, "z")
-    # K_prime = 0.4 * u_star * ymax * ((ymax - z)/ymax) * (1/ymax) - 0.4 * u_star *
-    #   ymax * (1/ymax) * (1 - ((ymax - z)/ymax))
-    # K_prime2_eq = D(K_prime_eq, "z")
-    # K_prime2 = -(0.4 * u_star * ymax * (1/ymax) * (1/ymax) + 0.4 * u_star * ymax *
-    #   (1/ymax) * (1/ymax))
-    #######################################################
+    z <- round(unname(inds[j, yloc]),1)
+    K_z <- K[which.min(depths - z)]
+    K_prime_z <- K_prime[which.min(depths - z)]
     
     #specify random walk following Visser 1997 https://www.int-res.com/articles/meps/158/m158p275.pdf
     # between Ross & Sharples paper and Visser 1997 paper, a lot of confusion re: what z is!
     # is it height above sediments, or depth with a negative sign, or depth with no negative sign
     # elev <- ymax - z
     
-    z_t1 <- z + K_prime*z*del_t + runif(1, min = -0.1,max = 0.1)*sqrt((2*K*(z + 0.5*K_prime*z*del_t)*del_t)/(1/3)) + w_s # w_s*del_t # this is needed if you use Stokes
+    z_t1 <- z + K_prime_z*z*del_t + runif(1, min = -0.1,max = 0.1)*sqrt((2*K_z*(z + 0.5*K_prime_z*z*del_t)*del_t)/(1/3)) + w_s # w_s*del_t # this is needed if you use Stokes
     
     ####### end test code #######################################################
     inds[j, yloc] <- z_t1
@@ -139,7 +149,7 @@ growth <- function(inds, repr_col = 7, traits = traits_lst, growth_env = env){
       fP = (FRP - P_0) / (FRP - P_0 + K_P)
       
     
-    inds[i, repr_col] <- rbinom(n = 1, size = 1, prob = umax*min(c(fT,fI,fN,fP)))
+    inds[i, repr_col] <- rbinom(n = 1, size = 1, prob = umax*max(c(fT,fI,fN,fP)))
     
   }
   
@@ -294,7 +304,7 @@ initialize_phytos <- function(depths){
 
 initialize_env <- function(depths, n_days){
   
-  env <- array(data = 0, dim = c(length(depths),8))
+  env <- array(data = 0, dim = c(length(depths),10))
   
   # first column is temperature
   wtemp <- read_csv("./data/cal_wtemp_GLM.csv") 
@@ -338,8 +348,8 @@ initialize_env <- function(depths, n_days){
   colnames(frp) <- c("depth",seq(1:(ncol(frp)-1)))
   env[,8] <- unlist(frp[,7])
   
-  colnames(env) <- c("wt","yloc","dens","visc","light","wnd","din","frp")
+  colnames(env) <- c("wt","yloc","dens","visc","light","wnd","din","frp","delta_z","buoyancy_freq")
   
   return(list(env_init = env, wtemp = wtemp, met = met, din = din, frp = frp))
   
-  }
+}

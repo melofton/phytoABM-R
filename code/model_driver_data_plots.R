@@ -199,6 +199,74 @@ K_plot <- K_heatmap(temp_data = temp, wnd, ymax)
 ggsave(K_plot, filename = "./plot_output/K_environment.png", device = "png",
        width = 6, height = 4, units = "in")
 
+
+# ustar plot
+
+ustar_plot <- function(temp_data = temp, wnd, ymax){
+  
+  density <- temp_data %>%
+    mutate(across(!Depth_m, water.density))
+  
+  td <- temp_data %>%
+    mutate(across(`0`:`23`, ~ thermo.depth(.x,depths = Depth_m))) %>%
+    first() %>%
+    select(-Depth_m) %>%
+    pivot_longer(`0`:`23`,names_to = "hour", values_to = "thermo.depth.m") %>%
+    mutate(hour = as.numeric(hour))
+  
+  avgEpiDense = density %>%
+    pivot_longer(`0`:`23`,names_to = "hour", values_to = "density") %>%
+    mutate(hour = as.numeric(hour)) %>%
+    left_join(td) %>%
+    group_by(hour) %>%
+    filter(any(Depth_m <= thermo.depth.m)) %>%
+    summarize(averageEpiDense = mean(density, na.rm = TRUE))
+  
+  u_star = uStar(wndSpeed = unlist(wnd$WindSpeed), wndHeight = 3, averageEpiDense = unlist(avgEpiDense$averageEpiDense))
+  
+  K_data <- array(data = 0, dim = c(length(temp_data$depth), 25))
+  K_data[,1] <- temp_data$depth
+  
+  for(i in 1:length(u_star)){
+    K_data[,i+1] <- 0.4*u_star[i]*ymax*((ymax - K_data[,1])/ymax)*(1-((ymax - K_data[,1])/ymax)) + 0.00001
+  }
+  
+  K_data <- data.frame(K_data)
+  colnames(K_data) <- c("depth",c(0:23))
+  
+  #wrangle final dataframe for plotting
+  # Re-arrange the data frame by date
+  K_data_new <- K_data %>%
+    pivot_longer(`0`:`23`, names_to = "Hour", values_to = "K_perm2pers") %>%
+    rename(Depth_m = depth) %>%
+    mutate(Hour = as.numeric(Hour))
+  
+  interp <- akima::interp(x=K_data_new$Hour, y = K_data_new$Depth_m, z = K_data_new$K_perm2pers,
+                          xo = seq(min(K_data_new$Hour), max(K_data_new$Hour), by = 0.1), 
+                          yo = seq(min(K_data_new$Depth_m), max(K_data_new$Depth_m), by = 0.01),
+                          extrap = T, linear = T, duplicate = "strip")
+  interp <- akima::interp2xyz(interp, data.frame=T)
+  
+  fig_title <- "Calculated K for 2021-08-09"
+  
+  p1 <- ggplot()+
+    geom_raster(data = interp, aes(x=x, y=y, fill = z))+
+    geom_line(data = td, aes(x=hour, y = thermo.depth.m, color = "Thermocline"), linewidth = 1)+
+    scale_y_reverse(expand = c(0,0))+
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_fill_gradientn(colours = rev(colorRamps::magenta2green(60)), na.value="gray")+
+    scale_color_manual(values = c("Thermocline" = "black"), name = "")+
+    labs(x = "Hour of day", y = "Depth (m)", title = fig_title,fill='K (m-2 s-1)')+
+    theme_bw()
+  
+  print(p1)
+  
+}
+
+K_plot <- K_heatmap(temp_data = temp, wnd, ymax)
+ggsave(K_plot, filename = "./plot_output/K_environment.png", device = "png",
+       width = 6, height = 4, units = "in")
+
 # plotting functions
 din_heatmap <- function(din_data, temp_data){
   

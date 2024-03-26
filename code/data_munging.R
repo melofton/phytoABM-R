@@ -175,11 +175,11 @@ library(lubridate)
 glm_version() 
 
 # Set nml file name
-sim_folder <- paste0("~/RProjects/FCR-phyto-modeling/Eco-KGML-transfer-learning/data/data_raw/ModelOutputFCR") 
+sim_folder <- paste0("~/RProjects/FCR-GLM-metrics/Surrogate_dataset/Deepm2_exm_weight2_EXO/output") 
 nc_file <- file.path(sim_folder, 'output.nc') 
 
 # Get vars
-all_vars <- sim_vars(nc_file)
+#all_vars <- sim_vars(nc_file)
 depths = seq(from = 0.1, to = 9.3, by = 0.1)
 vars = c("temp","NIT_amm","NIT_nit","PHS_frp")
 
@@ -229,9 +229,10 @@ wtemp <- get_var(nc_file, var_name = "temp", reference="surface", z_out=depths) 
   filter(date(DateTime) == "2021-08-09")
 
 cal_vars <- glm_out %>%
+  filter(date(DateTime) == "2021-08-09") %>%
   gather(temp_0.1:PHS_frp_9.3, key = "VarDepth", value = "value") %>%
-  separate(VarDepth, sep = "_", c("var1","var2","depth")) %>%
-  filter(date(DateTime) == "2021-08-09")
+  separate(VarDepth, sep = "_", c("var1","var2","depth")) 
+  
 
 cal_vars2 <- cal_vars %>%
   mutate(depth = ifelse(var1 == "temp",var2,depth))
@@ -282,6 +283,12 @@ met[6,2] <- (met[5,2]+met[7,2])/2
 met[20,2] <- (met[19,2]+met[21,2])/2
 
 write.csv(met, file = "./data/cal_met_GLM.csv",row.names = FALSE)
+
+##Get lake number
+lake <- read_csv("~/RProjects/FCR-GLM-metrics/Surrogate_dataset/Deepm2_exm_weight2_EXO/output/lake.csv") %>%
+  select(time, LakeNumber) %>%
+  filter(year(time) == 2021 & month(time) %in% c(6:9)) 
+write.csv(lake, "./data/lakeNumber.csv", row.names = FALSE)
 
 ##Statistics ----
 

@@ -63,11 +63,11 @@ traits_lst <- list(
 # ---- Start the simulation 
 env <- lake_env$env_init
 ts         <- 0;
-time_steps <- 60*330;
+time_steps <- 60*2;
 inds_hist  <- NULL;
 start_time <- Sys.time()
 while(ts < time_steps){
-  inds            <- movement(inds, env, yloc = 2, ymax = 9.3, wnd = unname(env[1,6]), delta_z = 9); 
+  inds            <- movement(inds, env, yloc = 2, ymax = 9.3, wnd = unname(env[1,6]), delta_z = 9, depths = lake_depths); 
   inds            <- growth(inds, repr_col = 7, traits = traits_lst, growth_env = env);
   inds            <- death(inds, traits = traits_lst);
   ts              <- ts + 1; 
@@ -88,7 +88,7 @@ print(run_time)
 # =============================================================================
 
 # load in previous model run if desired
-inds_hist <- readRDS("./model_output/ABM_output_330hr.rds")
+# inds_hist <- readRDS("./model_output/ABM_output_330hr.rds")
 
 ind_yloc <- array(data = NA, dim = c(time_steps,length(lake_depths)+1))
 colnames(ind_yloc) <- c("timestep",lake_depths)
@@ -114,7 +114,7 @@ plot_ts <- plot_yloc %>%
   summarize(surface_agents = sum(num_agents))
 
 # #Write output to file for plotting 
-write.csv(plot_yloc, file = "./model_output/ABM_depthByTimestep_330hr.csv", row.names = FALSE)
-write.csv(plot_ts, file = "./model_output/ABM_agentTimeseries_330hr.csv", row.names = FALSE)
+write.csv(plot_yloc, file = "./model_output/ABM_depthByTimestep_2hr.csv", row.names = FALSE)
+write.csv(plot_ts, file = "./model_output/ABM_agentTimeseries_2hr.csv", row.names = FALSE)
 
-saveRDS(inds_hist, file = "./model_output/ABM_output_330hr.rds")
+saveRDS(inds_hist, file = "./model_output/ABM_output_2hr.rds")
