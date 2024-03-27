@@ -25,6 +25,9 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9, de
   buoyancy_freq <- buoyancy.freq(wtr = env[,1], depths = lake_depths)
   env[,10] <- c(first(buoyancy_freq),buoyancy_freq)
   
+  #calculate thermocline depth (rLakeAnalyzer)
+  td = thermo.depth(wtr = env[,1], depths = env[,2])
+  
   #calculate N
   N <- sqrt(env[,10]) 
   
@@ -32,11 +35,13 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9, de
   K <- NULL
   
   for(i in 1:length(N)){
-    if(N[i] == 0){
+    if(N[i] == 0 & depths[i] < td){
       K[i] = 1e-2
+    } else if(N[i] == 0 & depths[i] > td) {
+      K[i] = 1e-6
+      
     } else {
       K[i] = 0.0000000000049 * ((9.80665*281.0694) / N[i])  #Area in km2 is 0.079 and we convert to square meters take the square root of that
-      
     }
   }
   
@@ -61,7 +66,7 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9, de
     # curr_dens <- env[which(env[,2] == round(inds[j,2],1)),3]
     # curr_visc <- env[which(env[,2] == round(inds[j,2],1)),4]
     
-    w_s <- 0.13/1440 #this is what's in Cayelan/Kamilla's GLM-AED calibration for cyanobacteria at FCR converted to meters per minute instead of per day
+    w_s <- -0.13/1440 #this is what's in Cayelan/Kamilla's GLM-AED calibration for cyanobacteria at FCR converted to meters per minute instead of per day
     # w_s <- ((9.8081*cell_diam[j]^2*(cell_dens[j] - curr_dens))/(18*cell_shape[j]*curr_visc))/100000 # Define the cell velocity given cell diameter, density, and shape
     
     
@@ -149,7 +154,7 @@ growth <- function(inds, repr_col = 7, traits = traits_lst, growth_env = env){
       fP = (FRP - P_0) / (FRP - P_0 + K_P)
       
     
-    inds[i, repr_col] <- rbinom(n = 1, size = 1, prob = umax*max(c(fT,fI,fN,fP)))
+    inds[i, repr_col] <- rbinom(n = 1, size = 1, prob = umax*min(c(fT,fI,fN,fP)))
     
   }
   

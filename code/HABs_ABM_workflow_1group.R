@@ -63,7 +63,7 @@ traits_lst <- list(
 # ---- Start the simulation 
 env <- lake_env$env_init
 ts         <- 0;
-time_steps <- 60*2;
+time_steps <- 60*48;
 inds_hist  <- NULL;
 start_time <- Sys.time()
 while(ts < time_steps){
@@ -114,7 +114,7 @@ plot_ts <- plot_yloc %>%
   summarize(surface_agents = sum(num_agents))
 
 # #Write output to file for plotting 
-write.csv(plot_yloc, file = "./model_output/ABM_depthByTimestep_2hr.csv", row.names = FALSE)
-write.csv(plot_ts, file = "./model_output/ABM_agentTimeseries_2hr.csv", row.names = FALSE)
+write.csv(plot_yloc, file = "./model_output/ABM_depthByTimestep_48hr.csv", row.names = FALSE)
+write.csv(plot_ts, file = "./model_output/ABM_agentTimeseries_48hr.csv", row.names = FALSE)
 
-saveRDS(inds_hist, file = "./model_output/ABM_output_2hr.rds")
+saveRDS(inds_hist, file = "./model_output/ABM_output_48hr.rds")
