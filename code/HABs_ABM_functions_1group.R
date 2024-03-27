@@ -45,7 +45,7 @@ movement <- function(inds, env, yloc = 2, ymax = 9.3, wnd = wnd, delta_z = 9, de
     }
   }
   
-  K_prime = c(first(diff(K)),diff(K))
+  K_prime = c(first(diff(K)),diff(K)) / 0.1 #0.1 is dz
   
   K_df <- data.frame(depth = as.numeric(depths),
                      K = K,
